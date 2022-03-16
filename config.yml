@@ -1,0 +1,9 @@
+version: 1
+
+integrations:
+  - name: Jira
+    base: 'https://confluence.toolsfdg.net/'
+    templates:
+      - name: Spaces
+        alias: 'cf/{{ space }}'
+        link: 'https://confluence.toolsfdg.net/display/{{ space }}'
