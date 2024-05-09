@@ -49,3 +49,5 @@ Temporary Items
 _init.sh
 
 dist/
+# the actual binary when running `go build`
+goto

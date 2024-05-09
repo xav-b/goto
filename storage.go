@@ -33,6 +33,7 @@ func (s *Storage) Init() error {
 	CREATE TABLE IF NOT EXISTS service (
 		id INTEGER primary KEY AUTOINCREMENT,
 
+		-- TODO: enforce uniqness
 		name TEXT,           -- Github
 		link TEXT NOT NULL,  -- https://github.com/xav-b/goto
 		alias TEXT NOT NULL, -- git/xav-b/goto
@@ -114,10 +115,18 @@ func (s *Storage) List(limit int) (results []*Service) {
 
 	if err := rows.Err(); err != nil {
 		// TODO: should return err
-		log.Fatalf("failed to fetch services: %v\n")
+		log.Fatalf("failed to fetch services: %v\n", err)
 	}
 
 	return results
+}
+
+func (s *Storage) Delete(alias string) {
+	sqlStmt := `DELETE FROM service WHERE alias = ?`
+
+	if _, err := s.db.Exec(sqlStmt, alias); err != nil {
+		log.Fatalf("failed to delete alias %s: %v\n", alias, err)
+	}
 }
 
 func (s *Storage) AliasService(service *Service) error {

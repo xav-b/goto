@@ -26,6 +26,10 @@ goto alias gh https://github.com
 # potentially with a template
 goto alias jira https://jira.company.com/projects/AB/issues/{{ . }}
 # then whatever provided after `jira/` will replace `{{ . }}` before opening the URL
+# add metadatas
+goto alias yt https://youtube.com \
+  -tag video -tag google \
+  -description "A kind of video website"
 
 # open an aliased website
 goto <alias>

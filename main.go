@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"runtime"
 	"strconv"
 	"strings"
@@ -16,6 +17,8 @@ import (
 )
 
 type tagFlags []string
+
+const DEFAULT_CONTEXT = "default"
 
 func (i *tagFlags) String() string {
 	return "my string representation"
@@ -76,7 +79,7 @@ func launch(alias string, storage *Storage) {
 		log.Printf("found it - will use templating\n")
 		t, _ := template.New("alias").Parse(service.Link)
 		if err := t.Execute(&url, argument); err != nil {
-			log.Printf("failed to execute template: %v\n")
+			log.Printf("failed to execute template: %v\n", err)
 		}
 
 		log.Printf("opening: %s\n", url.String())
@@ -95,38 +98,62 @@ func lsCmd(storage *Storage) {
 	table.SetBorder(false)
 	table.SetRowLine(false)
 	for i, service := range storage.List(100) {
+		// TODO: format `created` as a date
 		table.Append([]string{strconv.Itoa(i), service.Alias, service.Link, service.Description, strings.Join(service.Tags, ", "), service.CreatedAt})
 	}
 
 	table.Render()
 }
 
+func rmCmd(alias string, storage *Storage) {
+	defer storage.db.Close()
+
+	storage.Delete(alias)
+}
+
 func main() {
-	aliasCmd := flag.NewFlagSet("alias", flag.ExitOnError)
-	aliasCmd.Var(&tags, "tag", "link tags")
-	description := aliasCmd.String("description", "new alias", "description")
+	// NOTE: there are 2 scenarios: support for a flag so any command can quickly
+	// apply to a specific context, or a state setting, when we know everything
+	// else will apply to the same context. Here using env is a low-tech approach
+	// to it, but we could also consider a `goto context.set pro` command
+	context, found := os.LookupEnv("GOTO_CONTEXT")
+	if !found {
+		context = DEFAULT_CONTEXT
+	}
 
 	if len(os.Args) < 2 {
 		log.Fatalln("No command provided")
 	}
 
-	// TODO: make it a CLI argument
-	dbPath := "/tmp/goto.1.db"
+	// TODO: handl error
+	usr, _ := user.Current()
+	// TODO: automatically `mkdir` if necessary
+	dbPath := fmt.Sprintf("%s/.config/goto/%s.1.db", usr.HomeDir, context)
+
 	log.Printf("initializing data backend [driver=%s path=%v]\n", DB_DRIVER, dbPath)
 	storage, err := NewStorage(dbPath, false)
 	if err != nil {
 		log.Fatalf("err: %v\n", err)
 	}
-	// create tables
+
+	// create tables if necessary
 	if err := storage.Init(); err != nil {
 		log.Fatalf("failed to init DB: %v\n", err)
 	}
 
 	switch os.Args[1] {
-	// tTODO: edit command
+	// TODO: edit command, which could be an alias to... `alias`, and we simply
+	// support an upsert to update what has been provided
 	case "alias":
 		alias := os.Args[2]
 		link := os.Args[3]
+
+		// the remaining of the CLI will be parsed to support additional details on
+		// the alias, like description and tags
+		// TODO: help/-help/-h
+		aliasCmd := flag.NewFlagSet("alias", flag.ExitOnError)
+		aliasCmd.Var(&tags, "tag", "link tags")
+		description := aliasCmd.String("description", "", "description")
 		aliasCmd.Parse(os.Args[4:])
 
 		service := &Service{
@@ -138,6 +165,9 @@ func main() {
 		createAlias(service, storage)
 	case "ls":
 		lsCmd(storage)
+	case "rm":
+		// TODO: validate we got enough arguments
+		rmCmd(os.Args[2], storage)
 	default:
 		launch(os.Args[1], storage)
 	}
